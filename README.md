@@ -32,3 +32,12 @@ I. R PROGRAMMING
 14: Dates and Times
 
 15: Base Graphics
+
+II. 
+
+1: Manipulating Data with dplyr
+
+2: Grouping and Changing Data with dplyr
+
+3: Tidying data with tidyr
+
