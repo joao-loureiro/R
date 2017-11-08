@@ -1,9 +1,9 @@
 # R
 1. Swirl
-  
-  Solutions for Swirl interactive courses
+
+Solutions for Swirl interactive courses
 
 2. Data Camp
- 
-  Solutions for Data Camp interactive courses
+
+Solutions for Data Camp interactive courses
 
