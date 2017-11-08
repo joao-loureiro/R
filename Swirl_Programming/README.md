@@ -1,5 +1,4 @@
-# R
-Scripts and functions
+# Swirl
 
 I. R PROGRAMMING
 
