@@ -32,7 +32,7 @@ I. R PROGRAMMING
 
 15: Base Graphics
 
-II. 
+II.  GETTING AND CLEANING DATA
 
 1: Manipulating Data with dplyr
 
