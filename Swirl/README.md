@@ -1,4 +1,4 @@
-# Swirl
+# Swirl Interactive Courses
 
 I. R PROGRAMMING
 
