@@ -1,0 +1,31 @@
+require(dplyr)
+require(stringr)
+if (dir.exists("C:/Users/Joao.Loureiro/Desktop/Macros Pessoais/Criar STD"))
+{}else{dir.create("C:/Users/Joao.Loureiro/Desktop/Macros Pessoais/Criar STD")}
+setwd("C:/Users/Joao.Loureiro/Desktop/Macros Pessoais/Criar STD")
+list.files(getwd()) -> ficheiros
+for (i in 1:length(ficheiros)) {
+  read.csv(ficheiros[i], header = FALSE) -> leitura
+  unique(leitura) -> valores_unicos
+  names(valores_unicos) <- "Valores"
+  arrange(valores_unicos, valores_unicos[,1]) -> valores_unicos
+  rep(NA, length(valores_unicos)) -> Numeracao
+  cbind(valores_unicos, Numeracao) -> valores_unicos_numerados
+  j <- 0
+  for (j in 1:nrow(valores_unicos_numerados)) {
+    valores_unicos_numerados[j,2] <- j
+    str_pad(valores_unicos_numerados[j, 2], width = 2, side = "left", pad = "0") -> valores_unicos_numerados[j, 2]
+  }
+  if (i < 2) {
+    as.numeric(readline("Qual é a coluna pretendida? ")) -> Coluna
+  } else {
+    Coluna + 3 -> Coluna
+  }
+  cbind(valores_unicos_numerados, Coluna) -> valores_unicos_numerados
+  mutate(valores_unicos_numerados, Spec = paste(Coluna, "=", Numeracao, sep = "")) -> valores_unicos_numerados
+  select(valores_unicos_numerados, Valores, Spec) -> valores_unicos_numerados
+  as.vector(valores_unicos_numerados$Valores) -> vector_valores
+  as.vector(valores_unicos_numerados$Spec) -> vector_spec
+  c(matrix(c(vector_valores, vector_spec), 2, byrow = T)) -> temporario
+  write(temporario, paste(substr(ficheiros[i], 1, str_length(ficheiros[i])-4), ".std", sep = ""))
+}
