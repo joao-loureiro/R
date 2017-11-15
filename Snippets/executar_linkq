@@ -1,0 +1,265 @@
+#Fixa a drive Y: como a pasta de rede
+root <- "Y:/"
+setwd(root)
+
+#Pergunta o nome do serviço
+readline("Qual é o servico em questão? \n1. Worldpanel UK (HHs)\n2. Worldpanel UK (Indivs)") -> servico
+
+#Define a directoria do servico
+if (servico == "1") {
+  servico <- "demogs/wpanhisc/"
+} else {
+  servico <- "demogs/wpaniisc/"
+}
+
+#Pergunta o tipo de atributo
+readline("Qual é o tipo de atributo? \n1. Segmentação\n2. Link-Q") -> tipo_atributo
+if (tipo_atributo == "1") {
+  tipo_atributo <- ""
+} else {
+  tipo_atributo <- "_linkq/"
+}
+
+#Pergunta o ano e o período
+readline("Qual é o período a que se refere o atributo? (yyyypp): ") -> periodo
+
+#Pergunta o nome do atributo
+readline("Qual é o nome que queres que tenha o atributo? ") -> nome_atributo
+
+#Pergunta qual a descricao do atributo
+readline("Qual é a descrição do atributo? ") -> descricao_atributo
+
+#Cria directoria e define-a como directoria temporária
+temp <- paste(getwd(), servico, tipo_atributo, nome_atributo, sep = "")
+dir.create(temp)
+
+#####################################################################
+#Cria vectores para os ficheiros necessários para correr os atributos
+setwd(temp)
+
+if (tipo_atributo != "") {
+  
+  #setup.cnv
+  c("DEMOGS", "Demographics Dummy Database", "1", "2", "N", "N", paste("\\demogs\\",substr(servico, 8, 15), "\\", substr(tipo_atributo, 1,6), "\\", nome_atributo, "\\", nome_atributo, ".pan", sep = ""), "", "HHOLDS", "Worldpanel Households", "0", paste("\\demogs\\",substr(servico, 8, 15), "\\", substr(servico, 8, 15), ".dat", sep = ""), "PURCHS", "Purchases", "Buyers", "Buyers", "001,001,006", "1", "Occas", "Occasions", "028,006;034,001") -> setup_cnv
+  write(setup_cnv, file = "setup.cnv", ncolumns = 1)
+  
+  #setup.bat
+  c("@echo off", "", "call attach", "", "rd /s /q \\pv\\demogs.pw", "md \\pv\\demogs.pw", "\\pv\\util\\setup \\pv\\util\\setcon.ini < setup.set", "pause", "", "cls", "echo Now Running convert.exe.........", "\\pv\\util\\convert.exe  \\pv\\util\\setcon.ini .\\setup.cnv DUI", "type \\demogs\fin.txt", "rem pause", "", "echo .", paste("copy \\pv\\demogs.pw\\*.it0 \"\\demogs\\",substr(servico, 8, 15), "\\", substr(tipo_atributo, 1,6), "\\", nome_atributo, "\"", sep = ""), "echo .", "pause", "rd /s /q \\pv\\demogs.pw") -> setup_bat
+  write(setup_bat, file = "setup.bat", ncolumns = 1)
+  
+
+} else {
+  
+  #setup.cnv
+  c("DEMOGS", "Demographics Dummy Database", "1", "2", "N", "N", paste("\\demogs\\",substr(servico, 8, 15), "\\", nome_atributo, "\\", nome_atributo, ".pan", sep = ""), "", "HHOLDS", "Worldpanel Households", "0", paste("\\demogs\\",substr(servico, 8, 15), "\\", substr(servico, 8, 15), ".dat", sep = ""), "PURCHS", "Purchases", "Buyers", "Buyers", "001,001,006", "1", "Occas", "Occasions", "028,006;034,001") -> setup_cnv
+  write(setup_cnv, file = "setup.cnv", ncolumns = 1)
+  
+  #setup.bat
+  c("@echo off", "", "call attach", "", "rd /s /q \\pv\\demogs.pw", "md \\pv\\demogs.pw", "\\pv\\util\\setup \\pv\\util\\setcon.ini < setup.set", "pause", "", "cls", "echo Now Running convert.exe.........", "\\pv\\util\\convert.exe  \\pv\\util\\setcon.ini .\\setup.cnv DUI", "type \\demogs\fin.txt", "rem pause", "", "echo .", paste("copy \\pv\\demogs.pw\\*.it0 \"\\demogs\\",substr(servico, 8, 15),"\\", nome_atributo, "\"", sep = ""), "echo .", "pause", "rd /s /q \\pv\\demogs.pw") -> setup_bat
+  write(setup_bat, file = "setup.bat", ncolumns = 1)
+  
+}
+
+#setup.set
+c("DEMOGS", paste(nome_atributo, ".std", sep = ""), "\\demogs\\dummy2.std", "", "1", "Y") -> setup_set
+write(setup_set, file = "setup.set", ncolumns = 1)
+
+
+
+#####################
+#Lê os ficheiros xlsx
+# Abre a library readlx
+library(readxl)
+
+#Gera uma lista de ficheiros na directoria Y:\_R_template
+list.files(paste (root, "_R_template/", sep="")) -> lista
+
+#Procura, nessa lista, ficheiros com as sequências "data" ou "codebook" no nome
+lista[grep("Results", lista)] -> indice_resultados
+lista[grep("Codebook", lista)] -> indice_codebook
+
+#Lê o ficheiro correcto utilizando a lista e o indice
+read_excel(paste (root, "_R_template/", indice_resultados, sep="")) -> resultados
+
+#Agrega a primeira coluna (dos painelistas) à das respostas (que têm "v_" nos nomes das colunas)
+data.frame(resultados[,1], resultados[,grep("v_", names(resultados))], stringsAsFactors = FALSE) -> resultados_df
+
+##########################################
+#Limpa a data_frame contendo os resultados
+
+#Substitui texto livre por "B*" ("B*" -> resultados_df[i,j]), ou retira a coluna (resultados_df[-j] -> resultados_df)?
+#Constroi um vector de integers chamado texto_livre
+vector('integer') -> texto_livre
+
+#Adiciona a esse vector o número das colunas em que há texto livre
+for (i in 1:ncol(resultados_df)-1) {
+  if (class(resultados_df[,i]) == "character") {
+    c(texto_livre, i) -> texto_livre
+  }
+}
+
+#Armazena o nome das perguntas de texto livre
+names(resultados_df[texto_livre]) -> perguntas_texto_livre
+
+#Retira as colunas com texto livre se houver texto livre
+if (length(texto_livre)>0) {
+  resultados_df[-texto_livre] -> resultados_df
+} else {
+}
+
+#Substitui todas as sequências "-66", "-77" e "-99" por "A*"
+data.frame(lapply(resultados_df, gsub, pattern = "-66", replacement = "A*", fixed = TRUE), stringsAsFactors = FALSE) -> df_resultados_limpos
+data.frame(lapply(df_resultados_limpos, gsub, pattern = "-77", replacement = "A*", fixed = TRUE), stringsAsFactors = FALSE) -> df_resultados_limpos
+data.frame(lapply(df_resultados_limpos, gsub, pattern = "-99", replacement = "A*", fixed = TRUE), stringsAsFactors = FALSE) -> df_resultados_limpos
+
+##########################################
+#Normaliza o tamanho das colunas
+#Abre a library stringr
+library(stringr)
+
+#Normaliza todas as colunas a 2 dígitos, se necessário
+data.frame(lapply(df_resultados_limpos, str_pad, 2, "left", "0"), stringsAsFactors = FALSE) -> a
+#Normaliza a 1ª coluna a 6 dígitos
+data.frame(str_pad(df_resultados_limpos[,1], 6, "left", "0"), stringsAsFactors = FALSE) -> b
+
+#Junta b e a
+cbind(b, a[,2:ncol(a)]) -> c
+
+#Retira o nome das colunas (REMOVIDO)
+#names(c) <- NULL
+
+#Salva como ficheiro csv (REMOVIDO)
+#write.csv(c, "data.csv", quote = FALSE, row.names = FALSE)
+
+#####################################################
+#Faz o match entre o painel reduzido e a data frame c
+
+#Abre o painel reduzido e converte na data frame painel_reduzido
+read.csv(paste(root, servico, "_panel", "/wpanh.", substr(periodo, 4, 6), sep=""), header = FALSE) -> painel_reduzido
+
+#Uniformiza o tamanho do painelista e salva como data frame
+data.frame(str_pad(painel_reduzido[,1], 6, "left", "0"), stringsAsFactors = FALSE) -> painel_reduzido
+
+#Cria um vector lógico consoante haja ou não match de painelistas
+painel_reduzido[,1] %in% c[,1] -> painelistas_comuns
+
+#Selecciona os painelistas do painel_reduzido em que não há match
+as.character(painel_reduzido$str_pad.painel_reduzido...1...6...left....0..[!painelistas_comuns]) -> d
+
+#Cria uma data frame consoante o número de perguntas do linkq
+for (i in 1:(ncol(c)-1)) {cbind(d, "xx")->d}
+data.frame(d, stringsAsFactors = FALSE) -> painelistas_sem_match
+
+#Dá o mesmo nome das conlunas de c às colunas dos painelistas_sem_match
+names(c) -> names(painelistas_sem_match)
+
+#Junta as linhas de c aos painelistas_sem_match
+rbind(c, painelistas_sem_match) -> painel_final
+
+#Ordena o painel final pela primeira coluna
+library(dplyr)
+arrange(painel_final, painel_final[,1]) -> painel_final
+
+#Cria um vector de nomes das perguntas que não têm texto livro
+names(painel_final) -> perguntas_numericas
+
+#Retira os nomes das colunas ao painel_final
+names(painel_final) <- NULL
+
+#Grava um csv que é o ficheiro .pan
+write.csv(painel_final, paste(nome_atributo, ".pan", sep = ""), quote = FALSE, row.names = FALSE)
+
+#########################################
+#Copia o codebook para a directoria certa
+file.copy(paste (root, "_R_template/", indice_codebook, sep=""),  paste(root, servico, tipo_atributo, nome_atributo, sep=""))
+
+#Lê o codebook e guarda-o na data frame codebook
+read_excel(paste("y:/_R_template/", indice_codebook, sep = "")) -> codebook
+
+#Cria o ficheiro linkq_excel.vbs
+c("\'==========================================================================","'","' VBScript Source File -- Created with SAPIEN Technologies Primalcode 3.0","'","' NAME: ","'","' AUTHOR: tns , tns","' DATE  : 01/11/2010","'","' COMMENT: ","'","'==========================================================================","","dim nRow,nCol","dim objXl","dim text","dim fso","","nCol=6","nRow=7","count=5","","'create excel object","Set objXl = CreateObject(\"Excel.Application\")","'open the file",paste("objXl.Workbooks.Open ", "\"",paste(root, servico, tipo_atributo, nome_atributo, "/", indice_codebook, "\"", sep="")),"'for debuggin purposes show the excel file.  On real one set this to false","objXl.Visible = false","'make first sheet active.  replace sheet1 with sheet name if different","objXl.Sheets(1).Activate","","Set fso = CreateObject(\"Scripting.FileSystemObject\") ","Set f = fso.CreateTextFile(\"test.std\")","","'********* create a loop here to get all data","'get value of cell from position nrow,ncol",paste("do until nrow=", nrow(codebook)+2, sep=""),"  text=objXl.Cells(nRow, nCol).Value","  val1=objXl.Cells(nRow, 3).Value","","  If ( val1 <> \"varchar\" ) Then","","    If val1=\"int\"  Then count=count+3","    'wscript.echo text &\"-\" & val1","    If Len(text) >0 And text<>\" \" Then","","      f.writeline text","      If  val1=\"\"  Then","        f.writeline count+3 & \"=\"","      Else","        'If Len(val)=0 Then val=\"XX\"","        If val1=\"int\" And text<>\" \"  Then val1=\"00/99\"","        If Len(val1)=1 Then val1=\"0\" & val1","        f.writeline count & "=" & val1","      End If","","    End if","","End if","","nrow=nRow+1","Loop","'************************************","","f.close","Set f = nothing","Set fso = Nothing","","'close excel","objXl.quit","Set objXl=nothing") -> linkq_excel
+write(linkq_excel, file = "linkq-excel.vbs", ncolumns = 1)
+
+################################
+#Cria o std a partir do codebook
+
+#Cria a partir do numero de colunas do painel final, um índice chamado numero_perguntas
+ncol(painel_final) - 1 -> numero_perguntas
+
+#Constrói a sequência de colunas desde 8 ao final do ficheiro e define como colunas_std
+seq(from=8, by = 3, length.out = ncol(painel_final) - 1) -> colunas_std
+
+#Percorre as rows do codebook na primeira coluna (de cima para baixo), e caso não haja nada, preenche com o que houver na row anterior
+for (k in 1:nrow(codebook)) {
+  if (is.na (codebook[k, 1])) {celula -> codebook[k,1]} else {codebook[k,1] -> celula}
+}
+
+#Percorre as rows do codebook na terceira coluna e nivela os resultados para 2 caracteres
+for (m in 1:nrow(codebook)) {
+  str_pad(codebook[m,3], width = 2, side = "left", pad = "0") -> codebook[m, 3]
+}
+
+#Junta uma coluna ao final do codebook
+cbind(codebook, NA) -> codebook
+
+primeiro <- NULL
+ultimo <- NULL
+
+
+#Percorre as rows do codebook na primeira coluna (de baixo para cima)
+for (l in nrow(codebook):1) {
+  #Se a row na coluna 6 não estiver preenchida
+  if (!is.na(codebook[l,6]) && !is.na(codebook[l,3])) {
+    #Se não se tratar de uma pergunta de texto livre
+    if (codebook[l,1] %in% perguntas_numericas) {
+      #Preenche a ultima coluna com a informação da coluna, primeira e ultima opções
+      paste(colunas_std[numero_perguntas], "=", codebook[l, 3], sep = "") -> codebook[l, ncol(codebook)]
+      #Caso ultima opção estiver NULL, atribui o valor; caso contrário, vai definindo a primeira opção, até encontrar "int", e aí faz paste do que tem de fazer, e faz reset a tudo
+      if (is.null(ultimo)) {codebook[l, 3] -> ultimo} else {
+        if(!codebook[l,3]=="int") {  
+          codebook[l, 3] -> primeiro
+        } else {
+          paste(colunas_std[numero_perguntas], "=", primeiro, "/", ultimo, sep="") -> codebook[l, ncol(codebook)]
+          primeiro <- NULL
+          ultimo <- NULL
+          numero_perguntas - 1 -> numero_perguntas
+        }
+      }
+    }
+  }
+}
+
+#Percorre a ultima coluna de baixo para cima, e sempre que encontrar uma barra, junta à string total_bloco
+vector('character') -> total_bloco
+
+for (n in nrow(codebook):1) {
+  if (grepl("/", codebook[n, ncol(codebook)]) && !is.na(codebook[n, 3])) {
+    c(codebook[n, ncol(codebook)], total_bloco) -> total_bloco
+    print(total_bloco)
+    if (is.na(codebook[n-1, 3])) {
+      #print("encontrado total")
+      paste(total_bloco, collapse=";") -> codebook[n-1, ncol(codebook)]
+      total_bloco <- NULL
+    }
+    }
+  }
+
+#Retem só os valores que não são nulos da data frame
+subset(codebook, !is.na(codebook[,ncol(codebook)])) -> std_temporario
+
+#Cria uma data frame chamada std_final
+data.frame() -> std_final
+row_std_final = 1
+col_std_final = 1
+
+#Popula o std_final
+for (o in 1:nrow(std_temporario)) {
+  std_temporario[o, 6] -> std_final[row_std_final, col_std_final]
+  row_std_final + 1 -> row_std_final
+  std_temporario[o, ncol(std_temporario)] -> std_final[row_std_final, col_std_final]
+  row_std_final + 1 -> row_std_final
+}
+
+#Salva o std_final
+write(c(nome_atributo, descricao_atributo, "4000", "1", "1", "7F", nrow(std_final)/2+1, "N", "Total Household", "ALL", unlist(std_final), "8", "N"), file = paste(nome_atributo, ".std", sep = ""), ncolumns = 1)
+
