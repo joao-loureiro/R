@@ -1,0 +1,55 @@
+#NIVELA O NÚMERO DE CARACTERES POR COLUNA NUMA DATA FRAME
+#########################################################
+
+#Requisitos
+require(stringr)
+require (dplyr)
+require(readr)
+
+#Cria directoria temporária
+#if (dir.exists("Nivelador") == FALSE) {
+#    dir.create("Nivelador")
+#  } else {
+#}
+
+#Cria uma lista de todos os ficheiros na directoria de trabalho
+list.files(getwd()) -> lista_total_ficheiros
+
+#Cria uma lista de todos os ficheiros csv da directoria de trabalho
+lista_total_ficheiros[grep(".csv", lista_total_ficheiros)] -> lista_ficheiros_csv
+
+#Cria uma data frame a partir da lista de ficheiros csv
+data.frame(lista_ficheiros_csv) -> df_lista_ficheiros_csv
+names(df_lista_ficheiros_csv) <- "FICHEIROS CSV"
+df_lista_ficheiros_csv
+
+#Pergunta qual o ficheiro a ser importado
+readline(paste("Seleccione o ficheiro csv a importar (1 a ", length(lista_ficheiros_csv), "): ", sep = "")) -> indice_csv
+
+#Importa o ficheiro escolhido
+read.csv(lista_ficheiros_csv[as.numeric(indice_csv)]) -> dados_brutos
+
+#Guarda a informação original do número de variáveis e do respectivo nome
+names(dados_brutos) -> backup_nomes
+ncol(dados_brutos) -> numero_variaveis
+sapply(dados_brutos, function(x) max(nchar(x))) -> tamanhos
+
+#Percorre as colunas, fixa um tamanho a partir de tamanhos, e nivela a coluna
+for (tamanho in 1:length(tamanhos)) {
+  str_pad(dados_brutos[,tamanho], width = tamanhos[[tamanho]], side = "left", pad = "0") -> coluna_temporaria
+  cbind(dados_brutos, coluna_temporaria)  -> dados_brutos
+}
+
+#Corta dados_brutos ao meio e atribui-lhe os mesmos nomes
+dados_brutos[,(ncol(dados_brutos)/2+1):ncol(dados_brutos)] -> dados_refinados
+names(dados_refinados) <- backup_nomes
+
+#Guarda o ficheiro nivelados
+str_replace(lista_ficheiros_csv[as.numeric(indice_csv)], ".csv", "_NEW.csv") -> novo_ficheiro
+write.csv(dados_refinados, file = novo_ficheiro, quote = FALSE, row.names = FALSE)
+
+#Apaga directoria temporária
+#if (dir.exists("Nivelador") == TRUE) {
+#    unlink("Nivelador", recursive = TRUE)
+#  } else {
+#}
