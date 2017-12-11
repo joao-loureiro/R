@@ -27,16 +27,45 @@ df_lista_ficheiros_csv
 readline(paste("Seleccione o ficheiro csv a importar (1 a ", length(lista_ficheiros_csv), "): ", sep = "")) -> indice_csv
 
 #Importa o ficheiro escolhido
-read.csv(lista_ficheiros_csv[as.numeric(indice_csv)]) -> dados_brutos
+read.csv(lista_ficheiros_csv[as.numeric(indice_csv)], stringsAsFactors = FALSE) -> dados_brutos
+
+##########################################
+#Limpa a data_frame contendo os resultados
+
+#Substitui texto livre por "B*" ("B*" -> resultados_df[i,j]), ou retira a coluna (resultados_df[-j] -> resultados_df)?
+#Constroi um vector de integers chamado texto_livre
+vector('integer') -> texto_livre
+
+#Adiciona a esse vector o número das colunas em que há texto livre
+#for (i in 1:ncol(dados_brutos)-1) {
+#  if ((class(dados_brutos[,i]) != "integer") && (class(dados_brutos[,i]) != "numeric")) {
+#    c(texto_livre, i) -> texto_livre
+#  }
+#}
+
+#Armazena o nome das perguntas de texto livre
+#names(dados_brutos[texto_livre]) -> perguntas_texto_livre
+
+#Retira as colunas com texto livre se houver texto livre
+#if (length(texto_livre)>0) {
+#  dados_brutos[-texto_livre] -> dados_brutos
+#} else {
+#}
+
+#Substitui todas as sequências "-66", "-77" e "-99" por "A*"
+#data.frame(lapply(dados_brutos, gsub, pattern = "-66", replacement = "A*", fixed = TRUE), stringsAsFactors = FALSE) -> dados_brutos
+#data.frame(lapply(dados_brutos, gsub, pattern = "-77", replacement = "A*", fixed = TRUE), stringsAsFactors = FALSE) -> dados_brutos
+#data.frame(lapply(dados_brutos, gsub, pattern = "-99", replacement = "A*", fixed = TRUE), stringsAsFactors = FALSE) -> dados_brutos
+############################################
 
 #Guarda a informação original do número de variáveis e do respectivo nome
 names(dados_brutos) -> backup_nomes
 ncol(dados_brutos) -> numero_variaveis
-sapply(dados_brutos, function(x) max(nchar(x))) -> tamanhos
+sapply(dados_brutos, function(x) {max(nchar(as.character(x)), na.rm = TRUE)}) -> tamanhos
 
 #Percorre as colunas, fixa um tamanho a partir de tamanhos, e nivela a coluna
 for (tamanho in 1:length(tamanhos)) {
-  str_pad(dados_brutos[,tamanho], width = tamanhos[[tamanho]], side = "left", pad = "0") -> coluna_temporaria
+  str_pad(dados_brutos[,tamanho], width = tamanhos[[tamanho]], side = "left", pad = " ") -> coluna_temporaria
   cbind(dados_brutos, coluna_temporaria)  -> dados_brutos
 }
 
