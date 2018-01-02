@@ -1,0 +1,53 @@
+require(readr)
+require(dplyr)
+require(stringr)
+require(tidyr)
+require(purrr)
+
+#Muda a directoria para Desktop/Splitter Files
+setwd("C:/Users/Joao.Loureiro/Desktop/Splitter Files") 
+
+#Cria uma lista de ficheiros na directoria raiz
+list.files() -> lista_ficheiros_raiz
+
+#Cria um índice só com os ficheiros ST2
+grepl(".ST2", lista_ficheiros_raiz) -> indice_ST2
+
+#Cria uma lista de ficheiros ST2
+lista_ficheiros_raiz[indice_ST2] -> lista_ficheiros_ST2
+
+#Percorre os ficheiros ST2
+for (i in seq_along(lista_ficheiros_ST2)) {
+  print(paste("A criar std para ficheiro", as.character(i), "de", as.character(length(lista_ficheiros_ST2))))
+  #Abre of ficheiro ST2 como lista
+  read_lines(lista_ficheiros_ST2[i]) -> linhas_ficheiro_ST2_provisorio
+  #Fixa as linhas 1 a 6 como um cabecalho
+  linhas_ficheiro_ST2_provisorio[1:5] -> cabecalho
+  #Fixa as linhas 9 à última linha menos 5 como produtos
+  linhas_ficheiro_ST2_provisorio[9:(length(linhas_ficheiro_ST2_provisorio)-5)] -> produtos
+  #Fixa as últimas 2 linhas como final
+  linhas_ficheiro_ST2_provisorio[(length(linhas_ficheiro_ST2_provisorio)-1):length(linhas_ficheiro_ST2_provisorio)] -> final
+  #Define a linha 7 (ou seja, produtos a dividir por 3) como extensao
+  (length(produtos)) / 3 -> extensao
+  #Cria e define um índice para a selecção de produtos e linhas apenas (excluindo a linha de cada produto)
+  logical() -> indice_multiplos_3
+  for (j in seq_along(produtos)) {
+    indice_multiplos_3 <- c(indice_multiplos_3, j %% 3 != 0)
+  }
+  #Utiliza o índice criado para seleccionar só as linhas necessárias em produtos
+  produtos[indice_multiplos_3] -> produtos_finais
+  #Cria o std final
+  write(c(cabecalho, "7F", extensao, "N", produtos_finais, final), paste(str_sub(lista_ficheiros_ST2[i], start = 1, end = 8), ".std", sep = ""))
+}
+
+#Recria a lista de ficheiros na directoria raiz
+list.files() -> lista_ficheiros_raiz
+
+#Cria um índice só com os ficheiros std
+grepl(".std", lista_ficheiros_raiz) -> indice_std
+
+#Cria uma lista de ficheiros std
+lista_ficheiros_raiz[indice_std] -> lista_ficheiros_std
+
+#Converte a lista de ficheiros std no ficheiro setup.set
+write(c("DEMOGS", "dummy.std", lista_ficheiros_std, "", "1", "Y"), "setup.set")
