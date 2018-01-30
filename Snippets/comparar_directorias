@@ -1,0 +1,27 @@
+require(stringr)
+
+#Recolhe a primeira directoria
+readline("Qual é a primeira directoria a comparar? ") -> primeira_directoria
+
+#Transforma o caminho da primeira directoria em algo legível
+str_replace_all(primeira_directoria, "\\\\", '/') -> primeira_directoria
+
+
+#Recolhe a segunda directoria
+readline("Qual é a segunda directoria a comparar? ") -> segunda_directoria
+
+#Transforma o caminho da segunda directoria em algo legível
+str_replace_all(segunda_directoria, "\\\\", '/') -> segunda_directoria
+
+#CORRER A PARTIR DAQUI O SCRIPT PARA VOLTAR A VERIFICAR
+#Lista os ficheiros em ambas as directorias
+list.files(primeira_directoria) -> primeira_directoria
+list.files(segunda_directoria) -> segunda_directoria
+
+#Lista os ficheiros da primeira directoria não incluídos na segunda directoria
+!(primeira_directoria %in% segunda_directoria) -> primeiro_indice
+primeira_directoria[primeiro_indice]
+
+#Lista os ficheiros da segunda directoria não incluídos na primeira directoria
+!(segunda_directoria %in% primeira_directoria) -> segundo_indice
+segunda_directoria[segundo_indice]
