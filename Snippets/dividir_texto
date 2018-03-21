@@ -1,0 +1,25 @@
+require(readr)
+setwd("C://Users//Joao.Loureiro//Desktop//STDs")
+read_lines('specs.std') -> totalstd
+limite <- 10582
+divisao <- list()
+k = 1
+
+
+for (i in 1:189) {
+  divisao[[i]] <- i
+  minimo <- (i * limite) - limite + 1
+  maximo <- i*limite
+  print(as.character(minimo))
+  print(as.character(maximo))
+  for (j in minimo:maximo) {
+    print(j)
+      divisao[[i]][[k]] <- totalstd[j]
+      k <- k + 1
+  }
+  k <- 1
+}
+
+for (sublista in 1:length(divisao)) {
+  write(c(as.character(sublista), "PANELLISTS\n4000\n1\n1\n7F\n5291\nN", divisao[[sublista]],"8\nN"), paste(as.character(sublista),".std",sep=""))
+}
