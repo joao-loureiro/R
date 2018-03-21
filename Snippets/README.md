@@ -5,3 +5,4 @@ Snippets/Tools
 3. nivelar_colunas
 4. converter_splitter_files
 5. comparar_directorias
+6. dividir_texto
