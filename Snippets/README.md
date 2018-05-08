@@ -6,3 +6,5 @@ Snippets/Tools
 4. converter_splitter_files
 5. comparar_directorias
 6. dividir_texto
+7. criar_weights
+8. renomear_em_massa
