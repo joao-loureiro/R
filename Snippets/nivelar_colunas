@@ -32,7 +32,9 @@ readline(paste("O padding acontece do lado esquerdo (1) ou direito (2)? ", sep =
 if (lado_num == 2) {lado <- "right"} else {lado <- "left"}
 
 #Pergunta qual o caracter a utilizar para o padding
-readline(paste("Qual o caracter a utilizar para o padding? ", sep = "")) -> caract
+readline(paste("Qual o caracter a utilizar para o padding ('Enter' para espaço em branco)? ", sep = "")) -> car_num
+
+if (car_num == "") {caract <- "\x20"}
 
 #Importa o ficheiro escolhido
 read.csv(lista_ficheiros_csv[as.numeric(indice_csv)], stringsAsFactors = FALSE) -> dados_brutos
