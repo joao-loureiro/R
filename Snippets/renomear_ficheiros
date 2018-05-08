@@ -1,0 +1,10 @@
+setwd("C:/Users/Joao.Loureiro/Desktop")
+paste(getwd(),"/","1_46", sep = "") -> directoria
+setwd(directoria)
+list.files(directoria) -> ficheiros
+length(ficheiros) -> tamanho
+a <- 17
+for (i in tamanho:2) {
+  a <- a + 2
+  file.rename(toString(ficheiros[i]), paste(a,".pdf", sep = ""))
+}
