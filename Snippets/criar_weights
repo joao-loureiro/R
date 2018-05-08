@@ -1,0 +1,71 @@
+require(readr)
+require(dplyr)
+require(stringr)
+require(tidyr)
+
+#Define a directoria de trabalho
+setwd("C:/Users/Joao.Loureiro/Desktop/Macros Pessoais/Criar Weights")
+
+#Dá a escolher o ficheiro
+list.files() -> ficheiros
+
+#Cria um índice com os ficheiros csv
+data.frame(ficheiros[grep(".csv", ficheiros, ignore.case = TRUE)]) -> df_ficheiros_csv
+
+#Permite seleccionar um ficheiro
+df_ficheiros_csv
+readline(paste ("Qual o ficheiro a utilizar (1 a ", length(df_ficheiros_csv[,1]), ")? ", sep = "")) -> índice_ficheiro_csv
+
+#Cria variável com ficheiro csv
+read_csv(as.character(df_ficheiros_csv[índice_ficheiro_csv,1]), col_types = "cc") -> csv_weight
+
+#Define os tamanhos máximos das colunas
+sapply(csv_weight, function(x) {max(nchar(as.character(x)), na.rm = TRUE)}) -> tamanhos
+
+#Percorre as colunas, fixa um tamanho a partir de tamanhos, e nivela a coluna
+for (tamanho in 1:length(tamanhos)) {
+  str_pad(csv_weight[,tamanho], width = tamanhos[tamanho], side = "left", pad = "0") -> coluna_temporaria
+  cbind(csv_weight, coluna_temporaria)  -> csv_weight
+}
+
+#Corta csv_weight ao meio 
+csv_weight[,(ncol(csv_weight)/2+1):ncol(csv_weight)] -> csv_weight_nivelado
+
+#Pergunta o nome do serviço
+readline("Qual é o servico em questão? \n1. Worldpanel UK (HHs)\n2. Worldpanel UK (Indivs)") -> servico
+
+#Define a sigla do serviço
+if (servico == "1") {
+  servico <- "WG"
+} # else {
+  # servico <- "OUTRA COISA QUALQUER"
+#}
+
+#Pergunta o ano
+readline("Qual é o ano em questão (YYYY)? ") -> ano
+str_sub(ano, 3, 4) -> ano
+
+#Pergunta o período
+readline("Qual é o periodo em questão (PP)? ") -> periodo
+
+#Pergunta qual a base de dados
+readline("Qual é a base em questão? ") -> base
+str_sub(base, 1, 2) -> base
+
+#Cria a directoria em questão
+dir.create(paste(servico, ano, periodo, base, sep = ""))
+
+#Copia para essa directoria o ficheiro csv
+file.copy(paste(getwd(), "/", as.character(df_ficheiros_csv[,1]), sep = ""), paste(servico, ano, periodo, base, sep = ""))
+file.remove(paste(getwd(), "/", as.character(df_ficheiros_csv[,1]), sep = ""))
+
+#Cria o ficheiro attach.bat
+attach <- c('call \\demogs\\wpanhisc\\period.bat', '\\demogs\\matchcon \\demogs\\wpanhisc\\_panel\\wpanh.%period% 1 data.dat 1 6 7 6 Weights.pan "x" n')
+writeLines(attach, "attach.bat")
+file.copy(paste(getwd(), "/", "attach.bat", sep = ""), paste(servico, ano, periodo, base, sep = ""))
+file.remove(paste(getwd(), "/", "attach.bat", sep = ""))
+
+#Faz sort ao csv_weight_nivelado
+arrange(csv_weight_nivelado, csv_weight_nivelado[,1]) -> csv_weight_nivelado
+
+#Cria o ficheiro
