@@ -7,3 +7,7 @@ Solutions for Swirl interactive courses
 2: Data Camp
 
 Solutions for Data Camp interactive courses
+
+3: Snippets
+
+Scripts and snippets
