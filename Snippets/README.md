@@ -8,3 +8,4 @@ Snippets/Tools
 6. dividir_texto
 7. criar_weights
 8. renomear_em_massa
+9. implementacao_gather
