@@ -1,0 +1,47 @@
+#Carrega as packages necessárias
+require(readr)
+require(stringr)
+require(dplyr)
+
+#Lê o ficheiro | ATENÇÃO: O CSV deve estar em formato csv/UTF e a primeira linha deve ser apagada
+read_csv('china.csv', col_names = TRUE) -> china
+
+#Retira espaços aos nomes das colunas
+str_replace_all(names(china), " ", "_") -> names(china)
+
+#Selecciona os diferentes indivíduos
+select(china, 'Household_Number', 'Member_Number', 'First_Name', 'Last_Name', 'Birthdate', 'Sex', 'Weight_(Kg)', 'Heigth(cm)') -> china1
+select(china, 'Household_Number', 'Member_Number_1', 'First_Name_1', 'Last_Name_1', 'Birthdate_1', 'Sex_1', 'Weight_(Kg)_1', 'Heigth(cm)_1') -> china2
+select(china, 'Household_Number', 'Member_Number_2', 'First_Name_2', 'Last_Name_2', 'Birthdate_2', 'Sex_2', 'Weight_(Kg)_2', 'Heigth(cm)_2') -> china3
+select(china, 'Household_Number', 'Member_Number_3', 'First_Name_3', 'Last_Name_3', 'Birthdate_3', 'Sex_3', 'Weight_(Kg)_3', 'Heigth(cm)_3') -> china4
+select(china, 'Household_Number', 'Member_Number_4', 'First_Name_4', 'Last_Name_4', 'Birthdate_4', 'Sex_4', 'Weight_(Kg)_4', 'Heigth(cm)_4') -> china5
+select(china, 'Household_Number', 'Member_Number_5', 'First_Name_5', 'Last_Name_5', 'Birthdate_5', 'Sex_5', 'Weight_(Kg)_5', 'Heigth(cm)_5') -> china6
+
+#Filtra linhas em que apenas o 'Household_Number' está preenchido
+filter(china1, is.na(Member_Number) == FALSE) -> china1_flt
+filter(china2, is.na(Member_Number_1) == FALSE) -> china2_flt
+filter(china3, is.na(Member_Number_2) == FALSE) -> china3_flt
+filter(china4, is.na(Member_Number_3) == FALSE) -> china4_flt
+filter(china5, is.na(Member_Number_4) == FALSE) -> china5_flt
+filter(china6, is.na(Member_Number_5) == FALSE) -> china6_flt
+
+#Cria uma coluna para cada data frame filtrada com a informação do número de indivíduo
+mutate(china1_flt, Individual = 1) -> china1_flt_indiv
+mutate(china2_flt, Individual = 2) -> china2_flt_indiv
+mutate(china3_flt, Individual = 3) -> china3_flt_indiv
+mutate(china4_flt, Individual = 4) -> china4_flt_indiv
+mutate(china5_flt, Individual = 5) -> china5_flt_indiv
+mutate(china6_flt, Individual = 6) -> china6_flt_indiv
+
+#Atribui os mesmos nomes de colunas a todos os data frames filtrados e com a informação de indivíduo
+names(china1_flt_indiv) -> names(china2_flt_indiv)
+names(china1_flt_indiv) -> names(china3_flt_indiv)
+names(china1_flt_indiv) -> names(china4_flt_indiv)
+names(china1_flt_indiv) -> names(china5_flt_indiv)
+names(china1_flt_indiv) -> names(china6_flt_indiv)
+
+#Junta todos os data frames filtrados e com a informação de indivíduo
+rbind(china1_flt_indiv, china2_flt_indiv, china3_flt_indiv, china4_flt_indiv, china5_flt_indiv, china6_flt_indiv) -> china_final
+
+#Grava o resultado num ficheiro
+write_csv(china_final, 'china_final.csv')
