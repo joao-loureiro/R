@@ -1,0 +1,85 @@
+require(readxl)
+require(readr)
+require(dplyr)
+require(tidyr)
+require(rebus)
+require(stringr)
+
+#Define a directoria de trabalho
+setwd('C://Lightspeed')
+
+#Lê o painel
+ficheiro_painel <- 'C://Lightspeed//demog_q418.dat'
+#read_fwf(ficheiro_painel, tamanho_colunas, header = FALSE, stringsAsFactors=FALSE, sep = "\n", row.names = FALSE, col.names = FALSE) -> painel
+#read_fwf(ficheiro_painel, fwf_positions(inicio_fim$start, inicio_fim$end), col_types = str_pad("", length(tamanho_colunas), pad = "c"), na = c("", "NA"), skip = 0, n_max = 100) -> painel
+read_fwf(ficheiro_painel, fwf_positions(c(1, 5, 494, 801), c(4, 11, 499, 850)), col_types = "cccc", na = c("", "NA"), skip = 0) -> painel
+names(painel) <- c('YYMM', 'RESP_NUMBER', 'YYYYQQ', 'LIGHTSPEED')
+
+
+#Lê o lightspeed
+ficheiro_lightspeed <- 'C://Lightspeed//lightspeed.csv'
+read_csv(ficheiro_lightspeed, col_names = FALSE, col_types = 'cccc', na = "", quoted_na = FALSE, progress = show_progress()) -> lightspeed
+select(lightspeed, c(X1, X2, X4)) -> lightspeed
+names(lightspeed) <- c('YYMM', 'RESP_NUMBER', 'LIGHTSPEED')
+
+#Cálculo do quarter em Lightspeed
+calcularQuarter <- function(x) {
+  if (str_sub(x,3, 4) %in% c("01", "02", "03")) {trimestre <- "q1"}
+  if (str_sub(x,3, 4) %in% c("04", "05", "06")) {trimestre <- "q2"}
+  if (str_sub(x,3, 4) %in% c("07", "08", "09")) {trimestre <- "q3"}
+  if (str_sub(x,3, 4) %in% c("10", "11", "12")) {trimestre <- "q4"}
+  return(paste("20", str_sub(x, 1, 2), trimestre, sep = ""))
+}
+mutate(lightspeed, YYYYQQ = sapply(lightspeed$YYMM, calcularQuarter)) -> lightspeed
+
+#Agrega as colunas-chave no painel e em lightspeed
+mutate(painel, chave = paste(YYMM, RESP_NUMBER, YYYYQQ, sep = "")) -> painel
+mutate(lightspeed, chave = paste(YYMM, RESP_NUMBER, YYYYQQ, sep = "")) -> lightspeed
+
+#Faz o match entre lightspeed e painel
+left_join(painel, lightspeed, by = "chave") -> match
+
+#Combina as duas colunas lightspeed numa só: lightspeed_final
+match %>% unite(lightspeed_final, c(LIGHTSPEED.x, LIGHTSPEED.y)) -> match
+match$lightspeed_final %>% sapply(str_replace, pattern = "_NA", replacement = "") -> match$lightspeed_final
+match$lightspeed_final %>% sapply(str_replace, pattern = "NA_", replacement = "") -> match$lightspeed_final
+match$lightspeed_final %>% sapply(str_replace, pattern = "_.*", replacement = "") -> match$lightspeed_final
+
+#Ordena pelas colunas relevantes
+match %>% arrange(lightspeed_final, YYMM.x, RESP_NUMBER.x) -> match
+
+#Cria coluna com numero de participações
+as.data.frame(character(nrow(match))) -> participacoes
+cbind(match, participacoes) -> match
+NA -> match[,"participacoes"]
+
+#Preenche coluna de participacoes
+for (i in 1:nrow(match)) {
+    if (i == 1) {
+      numero <- 1
+      match[i,9] <- numero
+    }
+    if (i > 1 && (match[i,4] == match[i-1, 4])){
+      numero <- numero + 1
+      match[i,9] <- numero
+    } else {
+      numero <- 1
+      match[i,9] <- numero
+    }
+}
+
+#Preeche NA para
+match$participacoes[match$lightspeed_final == "NA"] <- "NA"
+
+#Selecciona as colunas relevantes (as do painel) e re-ordena pelas definições necessárias
+match %>% select(YYMM.x, RESP_NUMBER.x, YYYYQQ.x, lightspeed_final, participacoes) -> final
+mutate(final, onze = paste(YYMM.x, RESP_NUMBER.x, sep = "")) -> final
+final %>% select(onze, YYYYQQ.x, participacoes) -> final
+arrange(final, YYYYQQ.x, onze, participacoes) -> final
+final$onze %>% sapply(str_pad, width = 492, side = "right", pad = "x") -> final$onze
+final$participacoes %>% sapply(str_pad, width = 2, side = "left", pad = "0") -> final$participacoes
+
+
+#Escreve o ficheiro final num csv
+write_csv(final, 'painel_lightspeed.csv', na = "", append = FALSE, col_names = FALSE)
+
