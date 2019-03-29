@@ -1,11 +1,13 @@
 Snippets/Tools
 
-1. criar_stds
-2. executar_linkq
-3. nivelar_colunas
-4. converter_splitter_files
-5. comparar_directorias
-6. dividir_texto
-7. criar_weights
-8. renomear_em_massa
-9. implementacao_gather
+01. criar_stds
+02. executar_linkq
+03. nivelar_colunas
+04. converter_splitter_files
+05. comparar_directorias
+06. dividir_texto
+07. criar_weights
+08. renomear_em_massa
+09. implementacao_gather
+10. lightspeed
+11. dw_alco
