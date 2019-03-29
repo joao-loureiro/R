@@ -1,0 +1,62 @@
+require(readxl)
+require(readr)
+require(dplyr)
+require(tidyr)
+require(rebus)
+require(stringr)
+
+#Define a directoria de trabalho
+setwd('C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//ABinBev')
+
+#Lę o ficheiro do painel
+ficheiro_painel <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//ABinBev//demog_q418.dat'
+#read_fwf(ficheiro_painel, tamanho_colunas, header = FALSE, stringsAsFactors=FALSE, sep = "\n", row.names = FALSE, col.names = FALSE) -> painel
+#read_fwf(ficheiro_painel, fwf_positions(inicio_fim$start, inicio_fim$end), col_types = str_pad("", length(tamanho_colunas), pad = "c"), na = c("", "NA"), skip = 0, n_max = 100) -> painel
+read_fwf(ficheiro_painel, fwf_positions(c(1, 5, 50, 80, 77, 83, 494, 801), c(4, 11, 68, 82, 79, 85, 499, 850)), col_types = "cccccccc", na = c("", "NA"), skip = 0) -> painel
+names(painel) <- c('YEARMONTH', 'RESPONDENTID', 'DATE_COMPLETION_INTERVIEW', 'D_AGE', 'D_SEX', 'D_CLASS', 'YYYYQQ', 'LIGHTSPEED')
+
+#Lę o ficheiro postcodes (supostamente o mais completo até ŕ data)
+ficheiro_postcodes <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//ABinBev//postcodes.csv'
+read_csv(ficheiro_postcodes, col_names = FALSE, col_types = 'cc', na = "", quoted_na = FALSE, progress = show_progress()) -> postcodes
+names(postcodes) <- c('LIGHTSPEED', 'POSTCODES')
+
+#Faz o match entre postcodes e painel (com a chave de LIGHTSPEED)
+left_join(painel, postcodes, by = "LIGHTSPEED") -> painel_com_postcodes
+
+#Adapta os tamanhos das várias colunas
+sapply(painel_com_postcodes$D_AGE, str_pad, pad = "0", width = 3, side = c("left")) -> painel_com_postcodes$D_AGE
+sapply(painel_com_postcodes$D_SEX, str_pad, pad = "0", width = 3, side = c("left")) -> painel_com_postcodes$D_SEX
+sapply(painel_com_postcodes$D_CLASS, str_pad, pad = "0", width = 3, side = c("left")) -> painel_com_postcodes$D_CLASS
+str_sub(painel_com_postcodes$D_AGE, 2, 3) -> painel_com_postcodes$D_AGE
+str_sub(painel_com_postcodes$D_SEX, 3, 3) -> painel_com_postcodes$D_SEX
+str_sub(painel_com_postcodes$D_CLASS, 3, 3) -> painel_com_postcodes$D_CLASS
+
+#Apaga os espaços no DATE_COMPLETION_INTERVIEW
+str_replace(painel_com_postcodes$DATE_COMPLETION_INTERVIEW, " ", "") -> painel_com_postcodes$DATE_COMPLETION_INTERVIEW
+
+#Filtra painelistas sem postcodes e remove os painelistas Lightspeed duplicados
+filter(painel_com_postcodes, as.numeric(YEARMONTH) > 1712, is.na(POSTCODES) == TRUE) -> no_postcodes_1801_1901
+distinct(no_postcodes_1801_1901, LIGHTSPEED, .keep_all = TRUE) -> no_postcodes_1801_1901
+
+#Escreve os ficheiros finais em csv's
+write_csv(painel_com_postcodes, 'panel_with_postcodes.csv', na = "", append = FALSE, col_names = FALSE)
+write_csv(no_postcodes_1801_1901, 'no_postcodes_1801_1901.csv', na = "", append = FALSE, col_names = FALSE)
+
+#Agrega a info da provenięncia em termos de samples
+ficheiro_samples_2017 <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//ABinBev//2017_samples.csv'
+ficheiro_samples_2018 <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//ABinBev//2018_samples.csv'
+
+read_csv(ficheiro_samples_2017, col_names = TRUE, col_types = 'ccccccc', na = "", quoted_na = FALSE, progress = show_progress()) -> samples_2017
+read_csv(ficheiro_samples_2018, col_names = TRUE, col_types = 'cccccccccccc', na = "", quoted_na = FALSE, progress = show_progress()) -> samples_2018
+
+names(samples_2017) <- c("col1", "respondent_serial", "respondent_id", "mmyy", "comp", "sample", "LIGHTSPEED")
+names(samples_2018) <- c("col1", "respondent_serial", "respondent_id", "data_collection", "mmyy", "quota_gender", "quota_age", "quota_seg", "quota_region", "comp", "LIGHTSPEED", "sample")
+
+rbind(select(samples_2017, respondent_id, sample, LIGHTSPEED), select(samples_2018, respondent_id, sample, LIGHTSPEED)) -> all_samples
+distinct(all_samples, LIGHTSPEED, .keep_all = TRUE) -> all_samples
+
+left_join(no_postcodes_1801_1901, all_samples, by = "LIGHTSPEED") -> no_postcodes_1801_1901_final
+write_csv(no_postcodes_1801_1901_final, 'no_postcodes_1801_1901_final.csv')
+
+
+
