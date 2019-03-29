@@ -1,0 +1,173 @@
+#(Instala e) carrega a library de leitura de ficheiros Excel
+#install.packages('readxl')
+#install.packages('stringr')
+require(readxl)
+require(readr)
+require(dplyr)
+require(tidyr)
+require(stringr)
+
+#Define a directoria de trabalho
+setwd('C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision')
+
+#Selecciona e importa ficheiro com dicionário do painel
+ficheiro_dicionario_painel <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision//Alcovision_Powerview_Demog_datamap 2016 (Q22018).xlsx'
+dicionario_painel <- read_excel(ficheiro_dicionario_painel, sheet = 1)
+
+#Selecciona as colunas importantes
+select(dicionario_painel, c(2:3,6:8)) -> dicionario_painel
+names(dicionario_painel) <- c('start','end', 'q_text','code','answer_text')
+
+#Elimina as rows contendo histórico de definições (uma linha acima da pretendida, por causa dos nomes das colunas)
+dicionario_painel[1:1162,] -> dicionario_painel
+#Remove do dicionário as linhas com NA nas colunas relevantes
+drop_na(dicionario_painel, c(start,end)) -> dicionario_painel
+#Elimina os valores não categóricos da coluna code
+dicionario_painel$code[str_detect(dicionario_painel$code,"\\:")] <- NA
+#c("\\:","/",".","-")
+#Faz o padding dos códigos com um zero à esquerda
+mutate(dicionario_painel, code = str_pad(dicionario_painel$code, dicionario_painel$end - dicionario_painel$start + 1, side = c("left"), pad = "0")) -> dicionario_painel
+#Filtra o início e o fim das mesmas perguntas
+filter(dicionario_painel[,c(1:2,3)], !duplicated.data.frame(dicionario_painel[,1:2])) -> inicio_fim
+#Acrescenta a diferença entre o principio e o fim das colunas (caso necessário)
+mutate(inicio_fim, tamanho = inicio_fim$end-inicio_fim$start+1) -> inicio_fim
+#Define o vector tamanho de colunas a partir da coluna tamanho
+inicio_fim$tamanho -> tamanho_colunas
+
+#Lê o painel
+ficheiro_painel <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision//demog_q418.dat'
+#read_fwf(ficheiro_painel, tamanho_colunas, header = FALSE, stringsAsFactors=FALSE, sep = "\n", row.names = FALSE, col.names = FALSE) -> painel
+#read_fwf(ficheiro_painel, fwf_positions(inicio_fim$start, inicio_fim$end), col_types = str_pad("", length(tamanho_colunas), pad = "c"), na = c("", "NA"), skip = 0, n_max = 100) -> painel
+read_fwf(ficheiro_painel, fwf_positions(inicio_fim$start, inicio_fim$end), col_types = str_pad("", length(tamanho_colunas), pad = "c"), na = c("", "NA"), skip = 0) -> painel
+#Substitui espaços por underscores nos nomes das perguntas (decidiu-se que não era preciso, porque se podia utilizar [])
+#str_replace_all(inicio_fim$q_text, ' ', '_') -> inicio_fim$q_text
+#Substitui ' por '' nas opções das perguntas
+str_replace_all(dicionario_painel$answer_text, '\'', '\'\'') -> dicionario_painel$answer_text
+
+#Dá nomes às colunas
+inicio_fim$q_text -> names(painel)
+
+mutate(painel, chave = paste(painel$'Year/Quarter of interview',painel$'Month/Year', painel$'Respondent Number (7-digit)', sep = "")) -> painel
+
+#############################################################
+
+ficheiro_compras <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision//drinks_q418.dat'
+
+read_fwf(ficheiro_compras, fwf_positions(c(1, 5, 302, 305, 312, 494, 832, 1120, 1123),c(4, 11, 304, 308, 314, 499, 835, 1121, 1125)), col_types = "ccccccccc", na = c("", "NA"), skip = 0) -> compras
+
+c("mmyy", "id", "drink_cat", "type", "brand", "yyqq", "oebrand", "hkp1", "hkp2") -> names(compras)
+
+mutate(compras, chave = paste(yyqq, mmyy, id, sep = "")) -> compras
+
+
+#####################################
+
+#Beer & Cider | OK
+nrow(filter(compras, drink_cat %in% c("001","002"), compras$chave %in% painel$chave))
+
+#Beer | OK
+nrow(filter(compras, drink_cat %in% c("001"), compras$chave %in% painel$chave))
+
+#Classic Beer | OK
+nrow(filter(compras, drink_cat %in% c("001"), hkp1 %in% (c("40")), compras$chave %in% painel$chave))
+
+#################################################
+
+#There are 3(/4) columns feeding into HKPSEG attribute:
+  
+#a)	Drink Category (example: Beer, Cider, Spirits, etc.), coded in cols 302 to 304
+#b)	Drink Type (example: Lager, Bitter, Gin, Vodka, etc), coded in cols 305 to 308
+#c)	Heineken Macro Segment, coded in cols 1120 to 1121
+#d)	Heineken Micro Segment, coded in cols 1122 to 1124
+
+
+#1.	Are we confident that the coding of all named Beer & Cider brands to the HKPSEG attribute is exhaustive?
+
+filter(compras, 
+       compras$chave %in% painel$chave,
+       drink_cat %in% c("001"), 
+       !(brand %in% c(NA," 26","104","113","114","167","196","205","991","992","993","998")), 
+       !is.na(brand),
+       is.na(hkp1)) -> teste_1
+
+#8139 drinks with beer category and brand but not coded for attribute
+
+unique(teste_1$brand)
+
+#"145" "125" "094" "146" "149" "142" "151" "148" "006" "133" "029" "150" "069" "141" "147" "000" "181" "192" "180"
+
+# San Miguel 0.0% Limon
+# 302=001+305=008+312=145
+# Supermarket Own Label Lager
+# 302=001+305=001+312=145
+# 302=001+305=004+312=125,085
+# Supermarket Own Label Pale Ale
+#McEwans
+#302=001+305=002+312=094
+#McEwans Export
+#302=001+305=002+312=095
+#Supermarket Own Label Bitter
+#302=001+305=002+312=146
+#Heineken 0.0
+#302=001+305=008+312=146
+#Supermarket Own Label Mild
+#302=001+305=005+312=149
+#Stella Artois
+#302=001+305=008+312=142
+#Supermarket Own Label Non/Low
+#302=001+305=008+312=151
+#Supermarket Own Label Pale Ale
+#302=001+305=004+312=148
+#Brewdog Nanny State
+#302=001+305=008+312=148
+
+write_csv(teste_1, "teste_1.csv")
+
+filter(compras, 
+       compras$chave %in% painel$chave,
+       drink_cat %in% c("002"), 
+       !(brand %in% c(NA," 56","991","992","993","998")), 
+       !is.na(brand),
+       is.na(hkp1)) -> teste_2
+
+#5580 ciders not coded for attribute
+
+unique(teste_2$brand)
+
+#"026" "008" "019" "020" "011" "014" "189" "204" "205"
+
+
+write_csv(teste_2, "teste_2.csv")
+
+#K6 (old code);italic
+#302=002+312=008
+#Max (old code);italic
+#302=002+312=011
+# Red C (old code);italic
+# 302=002+312=014
+#Strongbow Ice
+#302=002+312=019
+#Strongbow Sirrus
+#302=002+312=020
+#Supermarket Own label Cider
+#302=002+312=026
+#Crabbies
+#302=002+((312=189);(832=0636))
+#Crabbies Raspberry Ginger Beer
+#302=002+312=204
+
+######################################################
+
+#2.	The differences between (for example) Total Beer and the sum of the segments - is this just un-attributed brands 
+#e.g. respondents who did not know the name of the brand consumed?  Is there anything else feeding into this?
+
+#The answer is related to the last question; while total beer is being fed with category and brand, subsegments are fed by position
+
+######################################################
+
+#3.	Please could you check the attached which compares the sum of segment serves to the total lines - there's something awry in Premium Lager.
+
+#Premium Lager
+#((302=001)+(1120=38))
+#Continental
+#((302=001)+(305=001)+(1120=38)+(1122=382))
