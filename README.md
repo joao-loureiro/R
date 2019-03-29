@@ -1,3 +1,0 @@
-# R
-
-Code snippets/scripts
