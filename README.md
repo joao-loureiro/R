@@ -1,3 +1,3 @@
 # R
 
-1. Snippets: Code snippets/scripts
+Code snippets/scripts
