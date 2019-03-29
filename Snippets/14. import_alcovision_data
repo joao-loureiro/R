@@ -1,0 +1,167 @@
+#(Instala e) carrega a library de leitura de ficheiros Excel
+#install.packages('readxl')
+#install.packages('stringr')
+require(readxl)
+require(readr)
+require(dplyr)
+require(tidyr)
+require(stringr)
+
+#Define a directoria de trabalho
+setwd('C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision')
+
+################################################################
+#Selecciona e importa ficheiro de painel e dicionário do painel#
+################################################################
+
+#Selecciona e importa ficheiro com dicionário do painel
+ficheiro_dicionario_painel <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision//Alcovision_Powerview_Demog_datamap 2016 (Q22018).xlsx'
+dicionario_painel <- read_excel(ficheiro_dicionario_painel, sheet = 1)
+
+#Selecciona as colunas importantes
+select(dicionario_painel, c(2:3,6:8)) -> dicionario_painel
+names(dicionario_painel) <- c('start','end', 'q_text','code','answer_text')
+
+#Elimina as rows contendo histórico de definições (uma linha acima da pretendida, por causa dos nomes das colunas)
+dicionario_painel[1:1162,] -> dicionario_painel
+#Remove do dicionário as linhas com NA nas colunas relevantes
+drop_na(dicionario_painel, c(start,end)) -> dicionario_painel
+#Elimina os valores não categóricos da coluna code
+dicionario_painel$code[str_detect(dicionario_painel$code,"\\:")] <- NA
+#c("\\:","/",".","-")
+#Faz o padding dos códigos com um zero à esquerda
+mutate(dicionario_painel, code = str_pad(dicionario_painel$code, dicionario_painel$end - dicionario_painel$start + 1, side = c("left"), pad = "0")) -> dicionario_painel
+#Filtra o início e o fim das mesmas perguntas
+filter(dicionario_painel[,c(1:2,3)], !duplicated.data.frame(dicionario_painel[,1:2])) -> inicio_fim
+#Acrescenta a diferença entre o principio e o fim das colunas (caso necessário)
+mutate(inicio_fim, tamanho = inicio_fim$end-inicio_fim$start+1) -> inicio_fim
+#Define o vector tamanho de colunas a partir da coluna tamanho
+inicio_fim$tamanho -> tamanho_colunas
+
+#Lê o painel
+ficheiro_painel <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision//demog_q418.dat'
+#read_fwf(ficheiro_painel, tamanho_colunas, header = FALSE, stringsAsFactors=FALSE, sep = "\n", row.names = FALSE, col.names = FALSE) -> painel
+#read_fwf(ficheiro_painel, fwf_positions(inicio_fim$start, inicio_fim$end), col_types = str_pad("", length(tamanho_colunas), pad = "c"), na = c("", "NA"), skip = 0, n_max = 100) -> painel
+read_fwf(ficheiro_painel, fwf_positions(inicio_fim$start, inicio_fim$end), col_types = str_pad("", length(tamanho_colunas), pad = "c"), na = c("", "NA"), skip = 0) -> painel
+#Substitui espaços por underscores nos nomes das perguntas (decidiu-se que não era preciso, porque se podia utilizar [])
+#str_replace_all(inicio_fim$q_text, ' ', '_') -> inicio_fim$q_text
+#Substitui ' por '' nas opções das perguntas
+str_replace_all(dicionario_painel$answer_text, '\'', '\'\'') -> dicionario_painel$answer_text
+
+#Dá nomes às colunas
+inicio_fim$q_text -> names(painel)
+#converte o painel em csv
+write_csv(painel, 'painel.csv', na = "")
+
+#Cria texto de criação da base SQL e tabela com o painel
+mutate(inicio_fim, concatenacao = paste('[', inicio_fim$q_text, ']', ' ', 'VARCHAR(', inicio_fim$tamanho, '),', sep='')) -> inicio_fim
+inicio_fim$concatenacao[nrow(inicio_fim)] <- str_sub(inicio_fim$concatenacao[nrow(inicio_fim)], end = -2)
+file.create('codigo.sql')
+write_lines('drop database if exists Projecto;', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('create database Projecto;', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('create table Projecto.dbo.painel (', 'codigo.sql', sep = '\r\n', append = TRUE)
+for (linha in seq_along(inicio_fim$concatenacao)) {
+    write_lines(inicio_fim$concatenacao[linha], 'codigo.sql', sep = '\r\n', append = TRUE)
+}
+write_lines(');', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('BULK INSERT Projecto.dbo.painel', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('FROM \'C:\\Users\\joao.loureiro\\Desktop\\Warehouse\\Macros Pessoais\\#R\\Projecto_Alcovision\\painel.csv\'', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('WITH', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('(', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('FIRSTROW = 2,', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('FIELDTERMINATOR = \',\',', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('ROWTERMINATOR = \'0x0a\',', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('TABLOCK,', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines('CODEPAGE = \'ACP\'', 'codigo.sql', sep = '\r\n', append = TRUE)
+write_lines(');', 'codigo.sql', sep = '\r\n', append = TRUE)
+
+#Cria as tabelas-dicionario associadas (juntamente com as de valores não categóricos)
+for (i in 1:nrow(inicio_fim)) {
+  write_lines(paste('create table Projecto.dbo.[', inicio_fim[i, 3], '] (valor varchar(255), codigo varchar(', inicio_fim[i, 4], '));', sep = ''), 'codigo.sql', sep = '\r\n', append = TRUE)
+}
+
+#Faz update às tabelas-dicionario associadas com os valores correspondentes
+for (i in 1:nrow(dicionario_painel)) {
+  #Apaga as tabelas-dicionário de valores não categóricos
+  if(is.na(dicionario_painel[i, 4])) {
+    write_lines(paste('drop table Projecto.dbo.[', dicionario_painel[i, 3], '];', sep = ''), 'codigo.sql', sep = '\r\n', append = TRUE)
+  } else {
+    write_lines(paste('insert into Projecto.dbo.[', dicionario_painel[i, 3], '] (valor, codigo) values (\'', dicionario_painel[i, 5], '\', \'', dicionario_painel[i, 4], '\');', sep = ''), 'codigo.sql', sep = '\r\n', append = TRUE)
+  }
+}
+  
+#######################################################
+#Selecciona e importa ficheiro de bebidas e dicionario#
+#######################################################
+
+ficheiro_dicionario_compras <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision//Alcovision Powerview Drink datamap (Q22018).xlsx'
+dicionario_compras <- read_excel(ficheiro_dicionario_compras, sheet = 1)
+
+#Altera as linhas marcadas como 'blank' na coluna 9, preparando-as para o drop_na()
+dicionario_compras$start[dicionario_compras$`Answer Text` == "blank"] <- NA
+dicionario_compras$end[dicionario_compras$`Answer Text` == "blank"] <- NA
+
+#Selecciona as colunas importantes
+select(dicionario_compras, c(1:2,7:10)) -> dicionario_compras
+names(dicionario_compras) <- c('start','end','q_text','code','answer_text','filter')
+
+#Elimina as rows contendo segmentações dos clientes (uma linha acima da pretendida, por causa dos nomes das colunas)
+dicionario_compras[1:2495,] -> dicionario_compras
+#Remove do dicionário as linhas com NA nas colunas relevantes
+drop_na(dicionario_compras, c(start,end)) -> dicionario_compras
+#Elimina os valores não categóricos da coluna code
+dicionario_compras$code[str_detect(dicionario_compras$code,"\\:")] <- NA
+#c("\\:","/",".","-")
+#Faz o padding dos códigos com um zero à esquerda
+mutate(dicionario_compras, code = str_pad(dicionario_compras$code, dicionario_compras$end - dicionario_compras$start + 1, side = c("left"), pad = "0")) -> dicionario_compras
+#Filtra o início e o fim das mesmas perguntas
+filter(dicionario_compras[,c(1:2,3,6)], !duplicated.data.frame(dicionario_compras[,1:3])) -> inicio_fim
+#Acrescenta a diferença entre o principio e o fim das colunas (caso necessário)
+mutate(inicio_fim, tamanho = inicio_fim$end-inicio_fim$start+1) -> inicio_fim
+#Define o vector tamanho de colunas a partir da coluna tamanho
+inicio_fim$tamanho -> tamanho_colunas
+
+#Lê o ficheiro com as drinks
+ficheiro_compras <- 'C://Users//joao.loureiro//Desktop//Warehouse//Macros Pessoais//#R//Projecto_Alcovision//drinks_q418.dat'
+#read_fwf(ficheiro_painel, tamanho_colunas, header = FALSE, stringsAsFactors=FALSE, sep = "\n", row.names = FALSE, col.names = FALSE) -> painel
+#read_fwf(ficheiro_painel, fwf_positions(inicio_fim$start, inicio_fim$end), col_types = str_pad("", length(tamanho_colunas), pad = "c"), na = c("", "NA"), skip = 0, n_max = 100) -> painel
+read_fwf(ficheiro_compras, fwf_positions(inicio_fim$start, inicio_fim$end), col_types = str_pad("", length(tamanho_colunas), pad = "c"), na = c("", "NA"), skip = 0) -> compras
+#Substitui espaços por underscores nos nomes das perguntas (decidiu-se que não era preciso, porque se podia utilizar [])
+#str_replace_all(inicio_fim$q_text, ' ', '_') -> inicio_fim$q_text
+#Substitui ' por '' nas opções das perguntas
+str_replace_all(dicionario_compras$answer_text, '\'', '\'\'') -> dicionario_compras$answer_text
+
+#Dá nomes às colunas
+inicio_fim$q_text -> names(compras)
+#Lê as tabelas de filtros [Falta automatizar a definição dos filtros]
+filtros_simples <- read_excel(ficheiro_dicionario_compras, sheet = 2)
+filtros_combinados <- read_excel(ficheiro_dicionario_compras, sheet = 3)
+#Define os filtros simples
+f01 <- compras$`Off/On Trade` == as.character(filtros_simples[1,6])                             #Off Trade
+f02 <- compras$`Off/On Trade` == as.character(filtros_simples[2,6])                             #On Trade
+f03 <- compras$`Drink category` == as.character(filtros_simples[3,6])                           #Beer
+f04 <- compras$`Drink category` == as.character(filtros_simples[4,6])                           #Cider
+f05 <- compras$`Drink category` == as.character(filtros_simples[5,6])                           #RTDs
+f06 <- compras$`Drink category` == as.character(filtros_simples[6,6])                           #Sherry
+f07 <- compras$`Drink category` == as.character(filtros_simples[7,6])                           #Soft Drink
+f08 <- compras$`Drink category` == as.character(filtros_simples[8,6])                           #Spirits
+f09 <- compras$`Drink category` == as.character(filtros_simples[9,6])                           #Vermouth
+f10 <- compras$`Drink category` == as.character(filtros_simples[10,6])                          #Wine
+f11 <- compras$`Type of beer (Beer)` == as.character(filtros_simples[11,6])                     #Bitter
+f12 <- compras$`Type of spirit (Spirits)` == as.character(filtros_simples[12,6])                #Cocktails
+f13 <- compras$`Wine type (Wine)` == as.character(filtros_simples[13,6])                        #Champagne
+f14 <- !f13                                                                                     #Not Champagne
+f15 <- compras$`Type of solus soft drink (Soft Drink)` == as.character(filtros_simples[15,6])   #Water
+f16 <- !f15                                                                                     #Not Water
+f17 <- compras$`Whether spirit drunk neat or with mixer` == as.character(filtros_simples[17,6]) #Mixer                  #Mixer
+#Define os filtros combinados
+f18 <- f03 & f11 #Bitter (Beer)
+f19 <- f08 & f12 #Cocktails (Spirits)
+f20 <- f10 & f13 #Champagne (Wine)
+f21 <- f10 & f14 #Not Champagne (Wine)
+f22 <- f07 & f15 #Water (Soft Drinks)
+f23 <- f07 & f16 #Not Water (Soft Drinks)
+f24 <- f08 & f17 #Mixer (Spirits)
+f25 <- f01 & f10 #Wine (On Trade)
+f26 <- f01 & f08 #Spirits (Off Trade)
+
